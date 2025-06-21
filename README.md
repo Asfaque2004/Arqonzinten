@@ -32,8 +32,8 @@ This project is a modern, mobile-friendly Tile Calculator web application featur
 
 ## Optional: LLM Backend Integration
 - The app is designed to work fully frontend-only, but you can extend it with an AI backend (OpenAI GPT, Gemini, Rasa, etc.) for more advanced conversational flows.
-- See comments in the code for integration points.
-
+- Ive worked with LLMs before but ive only used them for summarization and other generative purposes where in i already had data. So i wasnt sure how to integrate the LLM for your catalogue. With guidance and more info I'm pretty sure i can do it!
+  
 ## Credits
 - UI/UX: Inspired by modern SaaS dashboards and chatbots
 - Product images: Sample/stock images for demo purposes
