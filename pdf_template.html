@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tile Calculator Results PDF</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #fff;
+      color: #222;
+      margin: 0;
+      padding: 0 0 24px 0;
+    }
+    .pdf-header {
+      text-align: center;
+      padding: 32px 0 12px 0;
+      border-bottom: 2px solid #20bfa9;
+      margin-bottom: 24px;
+    }
+    .pdf-header h1 {
+      margin: 0 0 8px 0;
+      font-size: 2rem;
+      color: #20bfa9;
+    }
+    .pdf-section {
+      max-width: 900px;
+      margin: 0 auto 24px auto;
+      padding: 0 16px;
+    }
+    .pdf-user-inputs {
+      background: #e0f4f1;
+      border-radius: 10px;
+      padding: 18px 24px 12px 24px;
+      margin-bottom: 24px;
+      font-size: 1.08rem;
+    }
+    .pdf-user-inputs h2 {
+      margin: 0 0 10px 0;
+      color: #179e8c;
+      font-size: 1.15rem;
+    }
+    .pdf-user-inputs table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .pdf-user-inputs td {
+      padding: 6px 8px;
+      font-size: 1.05rem;
+    }
+    .pdf-products-section h2 {
+      color: #179e8c;
+      font-size: 1.15rem;
+      margin: 0 0 16px 0;
+    }
+    .pdf-products-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px 16px;
+    }
+    .pdf-product-card {
+      background: #fff;
+      border: 1.5px solid #e0f4f1;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(44,62,80,0.07);
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .pdf-product-img {
+      width: 100%;
+      height: 120px;
+      background: #e0f4f1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border-bottom: 1px solid #e0f4f1;
+    }
+    .pdf-product-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .pdf-product-details {
+      padding: 12px 14px 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pdf-product-name {
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: #1a3c3d;
+      margin: 0 0 2px 0;
+    }
+    .pdf-product-size {
+      color: #20bfa9;
+      font-size: 0.98rem;
+      font-weight: 500;
+      margin: 0;
+    }
+    .pdf-product-price {
+      font-size: 1.08rem;
+      color: #20bfa9;
+      font-weight: 700;
+      margin: 0;
+    }
+    .pdf-product-reviews {
+      font-size: 0.97rem;
+      color: #6ec6b8;
+      margin: 0;
+    }
+    @media print {
+      body { background: #fff !important; }
+      .pdf-header { border-bottom: 1px solid #20bfa9; }
+      .pdf-section { box-shadow: none !important; }
+    }
+    @media (max-width: 900px) {
+      .pdf-products-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .pdf-products-grid { grid-template-columns: 1fr; }
+      .pdf-header { padding: 18px 0 8px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="pdf-header">
+    <h1>Tile Calculator Results</h1>
+  </div>
+  <div class="pdf-section">
+    <div class="pdf-user-inputs">
+      <h2>User Inputs</h2>
+      <table id="pdf-user-table"></table>
+    </div>
+    <div class="pdf-products-section">
+      <h2>Related Products</h2>
+      <div class="pdf-products-grid" id="pdf-products-grid"></div>
+    </div>
+  </div>
+  <script>
+    // Read data from localStorage
+    const userInputs = JSON.parse(localStorage.getItem('pdf_userInputs') || '{}');
+    const products = JSON.parse(localStorage.getItem('pdf_products') || '[]');
+    // Render user inputs
+    const userTable = document.getElementById('pdf-user-table');
+    const inputRows = [
+      ['Tile Type', userInputs.tileType || '-'],
+      ['Area', userInputs.area ? userInputs.area + (userInputs.unit === 'sqm' ? ' sq.m' : ' sq.ft') : '-'],
+      ['Unit', userInputs.unit ? (userInputs.unit === 'sqm' ? 'Sq.M' : 'Sq.Ft') : '-'],
+      ['Tile Size', userInputs.tileSize || '-'],
+      ['Budget', userInputs.budget ? `₹${userInputs.budget}${userInputs.unit === 'sqm' ? ' /sq.m' : ' /sq.ft'}` : '-'],
+    ];
+    userTable.innerHTML = inputRows.map(row => `<tr><td><b>${row[0]}</b></td><td>${row[1]}</td></tr>`).join('');
+    // Render products
+    const grid = document.getElementById('pdf-products-grid');
+    if (products.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#b23c3c;font-size:1.1rem;">No related products found.</div>';
+    } else {
+      grid.innerHTML = products.map(prod => `
+        <div class="pdf-product-card">
+          <div class="pdf-product-img"><img src="${prod.img}" alt="${prod.name}"></div>
+          <div class="pdf-product-details">
+            <div class="pdf-product-name">${prod.name}</div>
+            <div class="pdf-product-size">${prod.size}</div>
+            <div class="pdf-product-price">₹${prod.price} / Sq.ft.</div>
+            <div class="pdf-product-reviews">${prod.reviews}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    // Auto-trigger print dialog after rendering
+    setTimeout(() => { window.print(); }, 500);
+  </script>
+</body>
+</html> 

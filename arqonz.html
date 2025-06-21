@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tile Calculator Chatbot | Arqonz</title>
+    <link rel="stylesheet" href="/Users/asfaque/Desktop/ai:ml/static/css/tile_calculator.css">
+</head>
+<body>
+    <div class="arqonz-logo-bar">
+        <img src="/Users/asfaque/Desktop/ai:ml/static/Logo-Arq.png" alt="Arqonz Logo" class="arqonz-logo">
+    </div>
+    <div class="main-flex">
+        <section class="howto-card">
+            <div class="CalcHeader">
+                <div class="CalcheaderLeft">
+                    <img src="/Users/asfaque/Desktop/ai:ml/static/calculator_Icon.svg" alt="">
+                </div>
+                <div class="CalcheaderRight">
+                    <h1>Tile Calculator</h1>
+                    <p>Easy Steps</p>
+                </div>
+            </div>
+            <h2>How To Use Tile Calculator</h2>
+            <ul class="howto-steps">
+                <li>STEP 1: Let us know whether you are looking for floor tiles or wall tiles.</li>
+                <li>STEP 2: Let us know the total area of the space. Please ensure to deduct the area of any doors or windows to arrive at the final area. Please enter the area in either Sq. Feet or Sq. Metre only.</li>
+                <li>STEP 3: Select the size of the tile you want from the dropdown option and click Calculate.</li>
+                <li>STEP 4: You will get the total number of tiles required or total number of boxes of tiles required.</li>
+                <li><b>Note</b>: Total tiles required are adjusted by 10% considering for wastage and design matching. It is assumed 4 tiles per box as a standard to calculate boxes.</li>
+            </ul>
+        </section>
+        <main class="chatbot-main">
+            <div class="chatbot-container" id="chatbot-container">
+                <div class="chatbot-header">
+                    <span class="chatbot-title">Tile Calculator</span>
+                    <button id="minimize-btn" aria-label="Minimize chatbot">_</button>
+                </div>
+                <div class="chatbot-messages" id="chatbot-messages" aria-live="polite"></div>
+                <div class="chatbot-quick-replies" id="chatbot-quick-replies"></div>
+                <form id="chatbot-form" autocomplete="off" aria-label="Chat input">
+                    <input type="text" id="chatbot-input" placeholder="Type your message..." aria-label="Type your message" />
+                    <button type="submit" aria-label="Send">Send</button>
+                </form>
+            </div>
+        </main>
+    </div>
+    <div class="Productsmain" id="Productsmain" style="display:none;">
+      <div class="RelatedProductsH">
+        <h2></h2>
+      </div>
+      <div class="PageProductsList" id="PageProductsList"></div>
+      <div style="text-align:center; margin: 24px 0 0 0;">
+        <button id="download-pdf-btn" style="background:#20bfa9;color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:1.08rem;font-weight:600;cursor:pointer;transition:background 0.2s;">Download Results as PDF</button>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+      // Rule-based chatbot logic for tile calculation
+      let chatHistory = [];
+      const chatbotMessages = document.getElementById('chatbot-messages');
+      const chatbotForm = document.getElementById('chatbot-form');
+      const chatbotInput = document.getElementById('chatbot-input');
+      const chatbotQuickReplies = document.getElementById('chatbot-quick-replies');
+
+      const tileSizes = [
+        { value: 7.75, label: '1200x600 MM (7.75 sq.ft)' },
+        { value: 1.94, label: '600x300 MM (1.94 sq.ft)' },
+        { value: 3.87, label: '600x600 MM (3.87 sq.ft)' },
+        { value: 1.45, label: '450x300 MM (1.45 sq.ft)' },
+        { value: 13.78, label: '1600x800 MM (13.78 sq.ft)' },
+        { value: 0.97, label: '300x300 MM (0.97 sq.ft)' },
+        { value: 23.23, label: '1800x1200 MM (23.23 sq.ft)' },
+        { value: 6.89, label: '800x800 MM (6.89 sq.ft)' }
+      ];
+
+      let state = {
+        step: 0,
+        tileType: '',
+        area: '',
+        unit: '',
+        tileSize: '',
+        budget: '',
+        budgetSqm: null
+      };
+
+      function addMessage(text, sender = 'bot') {
+        const msg = document.createElement('div');
+        msg.className = 'chatbot-message ' + sender;
+        if (sender === 'bot') {
+          msg.innerHTML = `<span class='chatbot-pfp'><img src="https://api.dicebear.com/7.x/bottts/svg?seed=ArqonzBot" alt="Bot" /></span><span class='chatbot-msg-text'>${text}</span>`;
+                    } else {
+          msg.innerHTML = text;
+        }
+        chatbotMessages.appendChild(msg);
+        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+        chatHistory.push({ role: sender === 'user' ? 'user' : 'bot', text });
+      }
+
+      function showQuickReplies(options) {
+        chatbotQuickReplies.innerHTML = '';
+        if (!options || !options.length) return;
+        // Remove duplicate labels
+        const seen = new Set();
+        options = options.filter(opt => {
+          if (seen.has(opt.label)) return false;
+          seen.add(opt.label);
+          return true;
+        });
+        options.forEach(opt => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'chatbot-quick-reply-btn';
+          btn.textContent = opt.label;
+          btn.onclick = () => {
+            addMessage(opt.label, 'user');
+            handleUserInput(opt.value);
+          };
+          chatbotQuickReplies.appendChild(btn);
+        });
+      }
+
+      function showBotTyping() {
+        hideBotTyping();
+        const loader = document.createElement('div');
+        loader.className = 'chatbot-message bot chatbot-loader-msg';
+        loader.id = 'chatbot-loader-msg';
+        loader.innerHTML = `<span class='chatbot-pfp'><img src="https://api.dicebear.com/7.x/bottts/svg?seed=ArqonzBot" alt="Bot" /></span><span class='chatbot-msg-text'><span class='chatbot-loader' aria-label='Bot is typing'><span class='dot'>.</span><span class='dot'>.</span><span class='dot'>.</span></span></span>`;
+        chatbotMessages.appendChild(loader);
+        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+      }
+      function hideBotTyping() {
+        const loader = document.getElementById('chatbot-loader-msg');
+        if (loader) loader.remove();
+      }
+
+      // Wrap bot responses with typing indicator and delay
+      async function botRespond(text) {
+        showBotTyping();
+        await new Promise(r => setTimeout(r, 1000));
+        hideBotTyping();
+        addMessage(text, 'bot');
+      }
+
+      async function resetChat() {
+        chatbotMessages.innerHTML = '';
+        chatHistory = [];
+        state = { step: 0, tileType: '', area: '', unit: '', tileSize: '', budget: '', budgetSqm: null };
+        await botRespond('<b>Welcome to the Tile Calculator!</b><br>Let me help you calculate the number of tiles you need.<br><br>Are you looking for <b>floor</b> or <b>wall</b> tiles?');
+        showQuickReplies([
+          { label: 'Floor', value: 'floor' },
+          { label: 'Wall', value: 'wall' }
+        ]);
+      }
+
+      async function handleUserInput(input) {
+        input = String(input).trim();
+        showQuickReplies([]);
+        console.log('[DEBUG] Step:', state.step, '| Input:', input, '| State:', JSON.stringify(state));
+        if (state.step === 0) {
+          if (/floor|wall/i.test(input)) {
+            state.tileType = /floor/i.test(input) ? 'floor' : 'wall';
+            state.step = 1;
+            console.log('[DEBUG] Selected tileType:', state.tileType);
+            await botRespond('Great! What is the <b>total surface area</b> you need to cover? (just the number)');
+          } else {
+            await botRespond('Please select <b>floor</b> or <b>wall</b>.');
+            showQuickReplies([
+              { label: 'Floor', value: 'floor' },
+              { label: 'Wall', value: 'wall' }
+            ]);
+          }
+        } else if (state.step === 1) {
+          const area = parseFloat(input);
+          if (!isNaN(area) && area > 0) {
+            state.area = area;
+            state.step = 2;
+            console.log('[DEBUG] Entered area:', state.area);
+            await botRespond('Is this area in <b>Sq.Ft</b> or <b>Sq.M</b>?');
+            showQuickReplies([
+              { label: 'Sq.Ft', value: 'sqft' },
+              { label: 'Sq.M', value: 'sqm' }
+            ]);
+          } else {
+            await botRespond('Please enter a valid number for the area.');
+          }
+        } else if (state.step === 2) {
+          if (/sq\.?\s*ft|ft|feet|sqft/i.test(input)) {
+            state.unit = 'sqft';
+            state.step = 2.5;
+            console.log('[DEBUG] Selected unit: sqft');
+          } else if (/sq\.?\s*m|m|meter|metre|sqm/i.test(input)) {
+            state.unit = 'sqm';
+            state.step = 2.5;
+            console.log('[DEBUG] Selected unit: sqm');
+          } else {
+            await botRespond('Please specify <b>Sq.Ft</b> or <b>Sq.M</b>.');
+            showQuickReplies([
+              { label: 'Sq.Ft', value: 'sqft' },
+              { label: 'Sq.M', value: 'sqm' }
+            ]);
+            return;
+          }
+          await botRespond('What is your <b>budget per ' + (state.unit === 'sqm' ? 'sq.m' : 'sq.ft') + '</b>? (just the number)');
+        } else if (state.step === 2.5) {
+          let budget = parseFloat(input);
+          if (!isNaN(budget) && budget > 0) {
+            // Convert budget to per sqft if unit is sqm
+            if (state.unit === 'sqm') {
+              budget = budget / 10.7639;
+              state.budgetSqm = input; // Store original for display
+            } else {
+              state.budgetSqm = null;
+            }
+            state.budget = budget;
+            state.step = 3;
+            await botRespond('Select a tile size:');
+            let options = tileSizes.map(t => ({ label: t.label, value: t.value }));
+            showQuickReplies(options);
+          } else {
+            await botRespond('Please enter a valid number for your budget per ' + (state.unit === 'sqm' ? 'sq.m' : 'sq.ft') + '.');
+          }
+        } else if (state.step === 3) {
+          // Accept value, label, or partial match for tile size
+          const inputLower = input.toLowerCase();
+          const tile = tileSizes.find(t =>
+            t.value == input ||
+            t.label.toLowerCase() === inputLower ||
+            t.label.toLowerCase().includes(inputLower) ||
+            inputLower.includes(t.label.toLowerCase())
+          );
+          console.log('[DEBUG] Tile size input:', input, '| Matched tile:', tile);
+          if (tile) {
+            state.tileSize = tile.value;
+            state.step = 4;
+            // Calculate
+            let areaInSqFt = parseFloat(state.area);
+            if (state.unit === 'sqm') areaInSqFt = areaInSqFt * 10.7639;
+            const tileSize = parseFloat(state.tileSize);
+            const tilesPerBox = 4;
+            const wastagePercentage = 0.1;
+            let totalTilesRequired = areaInSqFt / tileSize;
+            totalTilesRequired = Math.ceil(totalTilesRequired * (1 + wastagePercentage));
+            const totalBoxesRequired = Math.ceil(totalTilesRequired / tilesPerBox);
+            console.log('[DEBUG] Calculation:', { areaInSqFt, tileSize, totalTilesRequired, totalBoxesRequired });
+            await botRespond(
+              `<b>Result:</b><br>Tile pieces required: <b>${totalTilesRequired} pcs *</b><br>Total boxes required: <b>${totalBoxesRequired} boxes #</b><br><small>*Adjusting for 10% wastage.<br>#Assuming 4 Pcs per box.</small>`
+            );
+            // Ask if user wants to see matching tiles
+            await botRespond('Would you like to see tiles matching your selection?');
+            showQuickReplies([
+              { label: 'Yes', value: 'show_products' },
+              { label: 'No', value: 'no_products' }
+            ]);
+            state.step = 4.1;
+            return;
+          } else {
+            await botRespond('Please select a tile size from the options or type any part of the label or value.');
+            let options = tileSizes.map(t => ({ label: t.label, value: t.value }));
+            showQuickReplies(options);
+          }
+        } else if (state.step === 4.1) {
+          if (/show_products|yes/i.test(input)) {
+            state.step = 4.2;
+            showCatalogueForTileSize(state.tileSize);
+          } else if (/no_products|no/i.test(input)) {
+            state.step = 5;
+            document.getElementById('Productsmain').style.display = 'none';
+            await botRespond('Okay! If you want to see products later, just let me know.');
+            showQuickReplies([
+              { label: 'Restart', value: 'restart' }
+            ]);
+                } else {
+            await botRespond('Please select Yes or No.');
+            showQuickReplies([
+              { label: 'Yes', value: 'show_products' },
+              { label: 'No', value: 'no_products' }
+            ]);
+          }
+        }
+      }
+
+      chatbotForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const userInput = chatbotInput.value;
+        if (!userInput.trim()) return;
+        addMessage(userInput, 'user');
+        chatbotInput.value = '';
+        await handleUserInput(userInput);
+      });
+
+      // Minimize/expand logic
+      const chatbotContainer = document.getElementById('chatbot-container');
+      const minimizeBtn = document.getElementById('minimize-btn');
+      let minimized = false;
+      minimizeBtn.onclick = function() {
+        minimized = !minimized;
+        chatbotContainer.classList.toggle('minimized', minimized);
+        minimizeBtn.textContent = minimized ? '▢' : '_';
+      };
+
+      // Always start the chat with a welcome message
+      resetChat();
+
+      // Use these images in a loop for product images
+      const productImages = [
+        "https://media.gettyimages.com/id/1292585905/vector/oriental-moroccan-tile-seamless-pattern.jpg?s=612x612&w=gi&k=20&c=c_LW_5q8NUBEBneyXfSlRSVTyvUzcGIZAhVgI8oHfSU=",
+        "https://cdn.shopify.com/s/files/1/1777/2779/files/Classic-Toscano-A-8-_x_8--Tile-Grouping.jpg?15858804378312269012",
+        "https://www.emser.com/cdn/shop/products/DESIGN_OUTLINE_grande_4876aee9-3b89-4b5c-ba24-d1c782f4c8d0.jpg?v=1704329777",
+        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSwdjUgK4as8PYhJ_v4kjnxbAHhEgnLp_3ObQ&s",
+        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrPVcmztMz6FUJisS_iWaG5Wruu8i78XpL4A&s"
+      ];
+
+      // Sample tile catalogue data - MODIFIED TO MATCH CALCULATOR SIZES
+      const tileCatalogue = [
+        {
+          name: "Grande Valor Breccia Grey FP Gloss",
+          size: "1200x600 MM (7.75 sq.ft)",
+          value: 7.75,
+          price: 70,
+          img: productImages[0 % productImages.length],
+          reviews: 24,
+          link: "#"
+        },
+        {
+          name: "Bronze Tropic White Glossy",
+          size: "600x600 MM (3.87 sq.ft)",
+          value: 3.87,
+          price: 42,
+          img: productImages[1 % productImages.length],
+          reviews: 18,
+          link: "#"
+        },
+        {
+          name: "600x300 MM Tile",
+          size: "600x300 MM (1.94 sq.ft)",
+          value: 1.94,
+          price: 35,
+          img: productImages[2 % productImages.length],
+          reviews: 15,
+          link: "#"
+        },
+        {
+          name: "450x300 MM Tile",
+          size: "450x300 MM (1.45 sq.ft)",
+          value: 1.45,
+          price: 30,
+          img: productImages[3 % productImages.length],
+          reviews: 14,
+          link: "#"
+        },
+        {
+          name: "1600x800 MM Tile",
+          size: "1600x800 MM (13.78 sq.ft)",
+          value: 13.78,
+          price: 90,
+          img: productImages[4 % productImages.length],
+          reviews: 22,
+          link: "#"
+        },
+        {
+          name: "300x300 MM Tile",
+          size: "300x300 MM (0.97 sq.ft)",
+          value: 0.97,
+          price: 25,
+          img: productImages[0 % productImages.length],
+          reviews: 8,
+          link: "#"
+        },
+        {
+          name: "800x800 MM Tile",
+          size: "800x800 MM (6.89 sq.ft)",
+          value: 6.89,
+          price: 65,
+          img: productImages[1 % productImages.length],
+          reviews: 10,
+          link: "#"
+        },
+        {
+          name: "Classic Marquina Black",
+          size: "600x600 MM (3.87 sq.ft)",
+          value: 3.87,
+          price: 55,
+          img: productImages[2 % productImages.length],
+          reviews: 30,
+          link: "#"
+        },
+        {
+          name: "Ivory Stone Matt",
+          size: "1200x600 MM (7.75 sq.ft)",
+          value: 7.75,
+          price: 60,
+          img: productImages[3 % productImages.length],
+          reviews: 12,
+          link: "#"
+        },
+        {
+          name: "Urban Concrete Grey",
+          size: "600x300 MM (1.94 sq.ft)",
+          value: 1.94,
+          price: 28,
+          img: productImages[4 % productImages.length],
+          reviews: 9,
+          link: "#"
+        },
+        {
+          name: "Carrara White Gloss",
+          size: "800x800 MM (6.89 sq.ft)",
+          value: 6.89,
+          price: 80,
+          img: productImages[0 % productImages.length],
+          reviews: 16,
+          link: "#"
+        },
+        {
+          name: "Rustic Terra Cotta",
+          size: "300x300 MM (0.97 sq.ft)",
+          value: 0.97,
+          price: 22,
+          img: productImages[1 % productImages.length],
+          reviews: 6,
+          link: "#"
+        },
+        {
+          name: "Satin Beige",
+          size: "450x300 MM (1.45 sq.ft)",
+          value: 1.45,
+          price: 32,
+          img: productImages[2 % productImages.length],
+          reviews: 11,
+          link: "#"
+        },
+        {
+          name: "Emerald Green Gloss",
+          size: "1600x800 MM (13.78 sq.ft)",
+          value: 13.78,
+          price: 95,
+          img: productImages[3 % productImages.length],
+          reviews: 7,
+          link: "#"
+        },
+        {
+          name: "Classic White",
+          size: "600x600 MM (3.87 sq.ft)",
+          value: 3.87,
+          price: 38,
+          img: productImages[4 % productImages.length],
+          reviews: 19,
+          link: "#"
+        },
+        {
+          name: "Graphite Grey",
+          size: "1200x600 MM (7.75 sq.ft)",
+          value: 7.75,
+          price: 75,
+          img: productImages[0 % productImages.length],
+          reviews: 13,
+          link: "#"
+        }
+      ];
+
+      function floatEqual(a, b, tolerance = 0.01) {
+        return Math.abs(parseFloat(a) - parseFloat(b)) < tolerance;
+      }
+
+      function showCatalogueForTileSize(tileValue) {
+        const catalogueSection = document.getElementById('Productsmain');
+        const list = document.getElementById('PageProductsList');
+        list.innerHTML = '';
+        const targetValue = Number(tileValue);
+        const filtered = tileCatalogue.filter(prod =>
+          Math.abs(Number(prod.value) - targetValue) < 0.01 &&
+          Number(prod.price) <= Number(state.budget)
+        );
+        const heading = document.querySelector('.RelatedProductsH h2');
+        let budgetDisplay = `₹${state.budget}`;
+        if (state.unit === 'sqm' && state.budgetSqm) {
+          budgetDisplay = `₹${state.budgetSqm}/sq.m (≈ ₹${state.budget.toFixed(2)}/sq.ft)`;
+        } else {
+          budgetDisplay = `₹${state.budget}/sq.ft`;
+        }
+        if (filtered.length === 0) {
+          heading.innerHTML = `<span class='NoProductsMsg'>No products found for ${tileValue} sq.ft under your budget of ${budgetDisplay}.<br>Here are some alternatives within your budget:</span>`;
+          // Show some alternative products within budget
+          const alternatives = tileCatalogue.filter(prod =>
+            Number(prod.price) <= Number(state.budget)
+          );
+          if (alternatives.length > 0) {
+            // Pagination for alternatives
+            let altPage = 0;
+            const altPerPage = 4;
+            function renderAlternativesPage(page) {
+              const start = page * altPerPage;
+              const end = start + altPerPage;
+              const pageAlts = alternatives.slice(start, end);
+              // Render alternatives directly as product cards in #PageProductsList (no extra grid)
+              list.innerHTML = pageAlts.map(createProductCard).join('');
+              // Pagination controls
+              if (alternatives.length > altPerPage) {
+                let nav = document.createElement('div');
+                nav.className = 'pagination-nav';
+                nav.innerHTML = `<button class='pagination-btn' id='altPrev' ${page === 0 ? 'disabled' : ''}>&lt; Prev</button> <span class='pagination-page'>Page ${page+1} of ${Math.ceil(alternatives.length/altPerPage)}</span> <button class='pagination-btn' id='altNext' ${end >= alternatives.length ? 'disabled' : ''}>Next &gt;</button>`;
+                list.appendChild(nav);
+                nav.querySelector('#altPrev').onclick = () => { renderAlternativesPage(page-1); };
+                nav.querySelector('#altNext').onclick = () => { renderAlternativesPage(page+1); };
+              }
+            }
+            renderAlternativesPage(altPage);
+          }
+        } else {
+          heading.innerHTML = `Recommended Products (${tileValue} sq.ft, Budget: ${budgetDisplay})`;
+          list.innerHTML = filtered.map(createProductCard).join('');
+        }
+        catalogueSection.style.display = 'block';
+      }
+
+      function createProductCard(prod) {
+        return `
+                    <div class="PageProductCard">
+                <div class="ProductFeaImg">
+            <img src="${prod.img}" alt="${prod.name}">
+                </div>
+                <div class="ProductPropertiesSection">
+                        <div class="ProdName">
+              <p class="ProductCardName">${prod.name}</p>
+              <p class="ProductCardSize">${prod.size}</p>
+            </div>
+                    <div class="ProdPrice">
+              <p class="ProductcardPrice"><span class="ProdPriceRs">
+                <span class="RupeeSymbol">₹</span> 
+                <span class="ProductPriceAmt">${prod.price}</span>
+                <span class="PriceUnits">/ Sq.ft.</span>
+              </span></p>
+            </div>
+                    <div class="ProdReviews">
+              <p class="ProdCardReviews">${prod.reviews} Reviews</p>
+            </div>
+            <a href="${prod.link}" class="ProductCardName">
+                        <div class="ProdEnquire">
+                            <p class="ProdCardEnquire">View</p>
+                        </div>
+                    </a>
+                </div>
+        </div>`;
+      }
+
+      // PDF download logic
+      const downloadBtn = document.getElementById('download-pdf-btn');
+      if (downloadBtn) {
+        downloadBtn.onclick = function() {
+          // Gather user form inputs and related products
+          const userInputs = {
+            tileType: state.tileType,
+            area: state.area,
+            unit: state.unit,
+            tileSize: state.tileSize,
+            budget: state.budget,
+            budgetSqm: state.budgetSqm
+          };
+          // Get currently displayed products (either recommended or alternatives)
+          let products = [];
+          const productCards = document.querySelectorAll('.PageProductsList .PageProductCard');
+          productCards.forEach(card => {
+            products.push({
+              name: card.querySelector('.ProductCardName')?.textContent || '',
+              size: card.querySelector('.ProductCardSize')?.textContent || '',
+              price: card.querySelector('.ProductPriceAmt')?.textContent || '',
+              img: card.querySelector('img')?.src || '',
+              reviews: card.querySelector('.ProdCardReviews')?.textContent || '',
+            });
+          });
+          // Store in localStorage for the template page to read
+          localStorage.setItem('pdf_userInputs', JSON.stringify(userInputs));
+          localStorage.setItem('pdf_products', JSON.stringify(products));
+          // Open the template page
+          window.open('pdf_template.html', '_blank');
+        };
+      }
+        });
+    </script>
+</body>
+</html>
